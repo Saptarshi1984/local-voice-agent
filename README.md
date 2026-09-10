@@ -87,11 +87,12 @@ Click the green phone button to start a call — the mic stays open and auto-det
 
 ## Tech stack
 
-- [Next.js](https://nextjs.org) 16 (App Router) + React 19
+- [Next.js](https://nextjs.org) 16 (App Router) + [React](https://react.dev) 19, in TypeScript (API routes) and JSX (components)
+- [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) components, plain CSS for global styles
 - [Ollama](https://ollama.com) for local LLM inference
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) for speech-to-text
-- [Piper](https://github.com/rhasspy/piper) for text-to-speech
-- Tailwind CSS + shadcn/ui components
+- Python microservice ([FastAPI](https://fastapi.tiangolo.com)) for speech-to-text and text-to-speech:
+  - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) for speech-to-text
+  - [Piper](https://github.com/rhasspy/piper) for text-to-speech
 
 ## Notes
 
