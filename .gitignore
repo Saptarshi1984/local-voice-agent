@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# voice-service (Python sidecar: venv + downloaded piper voice models)
+voice-service/.venv/
+voice-service/piper-voices/
