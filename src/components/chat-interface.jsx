@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Mic, Phone, Plus, Settings } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Plus, Settings } from 'lucide-react';
 
 import { Message, MessageContent } from '@/components/ui/message';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
@@ -22,6 +22,8 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from '@/components/ui/input-group';
+import { EmailsDetailsClient } from '@/components/emails-details-client';
+import { EmailReaderClient } from '@/components/email-reader-client';
 
 const SILENCE_MS = 1500;
 const VOICE_THRESHOLD = 0.02;
@@ -68,6 +70,9 @@ export function ChatInterface() {
   const [cardState, setCardState] = useState('Ready');
   const [agentState, setAgentState] = useState('Sleeping...');
   const [isInCall, setIsInCall] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [emailDetails, setEmailDetails] = useState(null);
+  const [selectedEmail, setSelectedEmail] = useState(null);
 
   const streamRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -113,6 +118,10 @@ export function ChatInterface() {
 
       const data = await res.json();
       const replyText = data.message?.content ?? '';
+      if (data.emailDetails) {
+        setEmailDetails(data.emailDetails);
+        setSelectedEmail(null);
+      }
       setMessages((prev) => [
         ...prev,
         { id: crypto.randomUUID(), role: 'assistant', content: replyText },
@@ -227,6 +236,7 @@ export function ChatInterface() {
     lastVoiceTimeRef.current = performance.now();
     isInCallRef.current = true;
     setIsInCall(true);
+    setIsMuted(false);
     setAgentState('Awake...');
     setCardState('Listening...');
 
@@ -246,6 +256,7 @@ export function ChatInterface() {
   function endCall() {
     isInCallRef.current = false;
     setIsInCall(false);
+    setIsMuted(false);
     if (vadFrameRef.current) cancelAnimationFrame(vadFrameRef.current);
 
     if (mediaRecorderRef.current) {
@@ -265,6 +276,16 @@ export function ChatInterface() {
     } else {
       startCall();
     }
+  }
+
+  function toggleMute() {
+    setIsMuted((prev) => {
+      const next = !prev;
+      streamRef.current?.getAudioTracks().forEach((track) => {
+        track.enabled = !next;
+      });
+      return next;
+    });
   }
 
   return (
@@ -316,8 +337,12 @@ export function ChatInterface() {
             <CardDescription>Email & Calendar agent</CardDescription>
             <CardAction className="text-sm text-muted-foreground">{agentState}</CardAction>
           </CardHeader>
-          <CardContent>
-            <p>Card Content</p>
+          <CardContent className="scrollbar-hover h-100 overflow-y-auto border-t border-b border-border p-4">
+            {selectedEmail ? (
+              <EmailReaderClient email={selectedEmail} onBack={() => setSelectedEmail(null)} />
+            ) : (
+              <EmailsDetailsClient emails={emailDetails} onSelect={setSelectedEmail} />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -362,10 +387,13 @@ export function ChatInterface() {
           <Button
             variant="ghost"
             size="icon-lg"
-            className="rounded-full border border-border cursor-pointer"
-            aria-label="Toggle microphone"
+            onClick={toggleMute}
+            className={`rounded-full border cursor-pointer ${
+              isMuted ? 'bg-red-500 border-red-600 text-white' : 'border-border'
+            }`}
+            aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
           >
-            <Mic className="size-5" />
+            {isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
           </Button>
           <Button
             variant="ghost"
@@ -378,7 +406,7 @@ export function ChatInterface() {
             }`}
             aria-label={isInCall ? 'End call' : 'Start call'}
           >
-            <Phone className="size-5" />
+            {isInCall ? <PhoneOff className="size-5" /> : <Phone className="size-5" />}
           </Button>
           <Button
             variant="ghost"
