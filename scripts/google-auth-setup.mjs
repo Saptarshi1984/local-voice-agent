@@ -10,7 +10,10 @@ import { google } from 'googleapis';
 
 const PORT = 43219;
 const REDIRECT_URI = `http://localhost:${PORT}`;
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/calendar.events',
+];
 const TIMEOUT_MS = 5 * 60 * 1000;
 
 const credentialsPath = path.resolve(process.cwd(), 'src/app/data/credentials.json');

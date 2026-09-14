@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/input-group';
 import { EmailsDetailsClient } from '@/components/emails-details-client';
 import { EmailReaderClient } from '@/components/email-reader-client';
+import { CalendarEventsClient } from '@/components/calendar-events-client';
+import { CalendarEventDetailClient } from '@/components/calendar-event-detail-client';
 
 const SILENCE_MS = 1500;
 const VOICE_THRESHOLD = 0.02;
@@ -73,6 +75,8 @@ export function ChatInterface() {
   const [isMuted, setIsMuted] = useState(false);
   const [emailDetails, setEmailDetails] = useState(null);
   const [selectedEmail, setSelectedEmail] = useState(null);
+  const [calendarEvents, setCalendarEvents] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const streamRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -120,6 +124,14 @@ export function ChatInterface() {
       const replyText = data.message?.content ?? '';
       if (data.emailDetails) {
         setEmailDetails(data.emailDetails);
+        setSelectedEmail(null);
+        setCalendarEvents(null);
+        setSelectedEvent(null);
+      }
+      if (data.calendarEvents) {
+        setCalendarEvents(data.calendarEvents);
+        setSelectedEvent(null);
+        setEmailDetails(null);
         setSelectedEmail(null);
       }
       setMessages((prev) => [
@@ -340,6 +352,10 @@ export function ChatInterface() {
           <CardContent className="scrollbar-hover h-100 overflow-y-auto border-t border-b border-border p-4">
             {selectedEmail ? (
               <EmailReaderClient email={selectedEmail} onBack={() => setSelectedEmail(null)} />
+            ) : selectedEvent ? (
+              <CalendarEventDetailClient event={selectedEvent} onBack={() => setSelectedEvent(null)} />
+            ) : calendarEvents ? (
+              <CalendarEventsClient events={calendarEvents} onSelect={setSelectedEvent} />
             ) : (
               <EmailsDetailsClient emails={emailDetails} onSelect={setSelectedEmail} />
             )}
