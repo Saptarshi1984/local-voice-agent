@@ -70,7 +70,7 @@ export function ChatInterface() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [cardState, setCardState] = useState('Ready');
-  const [agentState, setAgentState] = useState('Sleeping...');
+  const [agentState, setAgentState] = useState('Sleeping');
   const [isInCall, setIsInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [emailDetails, setEmailDetails] = useState(null);
@@ -105,8 +105,8 @@ export function ChatInterface() {
     const userMessage = { id: crypto.randomUUID(), role: 'user', content: text };
     const chatHistory = [...messagesRef.current, userMessage];
     setMessages(chatHistory);
-    setAgentState('Thinking...');
-    setCardState('Busy...');
+    setAgentState('Awake');
+    setCardState('Busy');
     setInput('');
 
     try {
@@ -139,7 +139,7 @@ export function ChatInterface() {
         { id: crypto.randomUUID(), role: 'assistant', content: replyText },
       ]);
       setCardState('Ready');
-      setAgentState('Awake...');
+      setAgentState('Awake');
       if (replyText.trim()) {
         await speak(replyText);
       }
@@ -168,7 +168,7 @@ export function ChatInterface() {
     const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
     if (blob.size < 4000) return; // near-silent clip, skip the round-trip
 
-    setCardState('Transcribing...');
+    setCardState('Transcribing');
     try {
       const formData = new FormData();
       formData.append('audio', blob);
@@ -178,10 +178,10 @@ export function ChatInterface() {
       if (text && text.trim()) {
         handleSend({ preventDefault() {} }, text);
       } else {
-        setCardState('Listening...');
+        setCardState('Ready');
       }
     } catch (err) {
-      setCardState('Listening...');
+      setCardState('Ready');
     }
   }
 
@@ -197,6 +197,8 @@ export function ChatInterface() {
         recorder.stop();
       }
     }
+
+    setAgentState('Speaking');
 
     try {
       const res = await fetch('/api/speak', {
@@ -224,10 +226,14 @@ export function ChatInterface() {
         isSpeakingRef.current = false;
         hasSpeechRef.current = false;
         lastVoiceTimeRef.current = performance.now();
-        setCardState('Listening...');
+        setCardState('Ready');
+        setAgentState('Listening');
         startSegment();
       } else {
         isSpeakingRef.current = false;
+        if (!wasInCall) {
+          setAgentState('Awake');
+        }
       }
     }
   }
@@ -249,8 +255,8 @@ export function ChatInterface() {
     isInCallRef.current = true;
     setIsInCall(true);
     setIsMuted(false);
-    setAgentState('Awake...');
-    setCardState('Listening...');
+    setAgentState('Listening');
+    setCardState('Ready');
 
     startSegment();
     const refs = {
@@ -279,7 +285,7 @@ export function ChatInterface() {
     audioContextRef.current?.close();
 
     setCardState('Ready');
-    setAgentState('Sleeping...');
+    setAgentState('Sleeping');
   }
 
   function toggleCall() {
@@ -302,6 +308,12 @@ export function ChatInterface() {
 
   return (
     <div className="flex h-screen flex-col gap-4 p-4">
+      <div className="mx-auto w-full max-w-4xl text-center ">
+        <h1 className="text-4xl font-bold">Sid - Local Voice Agent</h1>
+        <p className="text-sm text-muted-foreground">
+          A voice assistant who can manage your emails and calendar events
+        </p>
+      </div>
       <div className="mx-auto flex w-full max-w-4xl gap-4">
         <Card className="flex-1">
           <CardHeader>
@@ -353,7 +365,10 @@ export function ChatInterface() {
             {selectedEmail ? (
               <EmailReaderClient email={selectedEmail} onBack={() => setSelectedEmail(null)} />
             ) : selectedEvent ? (
-              <CalendarEventDetailClient event={selectedEvent} onBack={() => setSelectedEvent(null)} />
+              <CalendarEventDetailClient
+                event={selectedEvent}
+                onBack={() => setSelectedEvent(null)}
+              />
             ) : calendarEvents ? (
               <CalendarEventsClient events={calendarEvents} onSelect={setSelectedEvent} />
             ) : (
@@ -416,9 +431,7 @@ export function ChatInterface() {
             size="icon-lg"
             onClick={toggleCall}
             className={`rounded-full border-2 text-white cursor-pointer ${
-              isInCall
-                ? 'bg-red-500 border-red-600 animate-pulse'
-                : 'bg-green-500 border-green-600'
+              isInCall ? 'bg-red-500 border-red-600 animate-pulse' : 'bg-green-500 border-green-600'
             }`}
             aria-label={isInCall ? 'End call' : 'Start call'}
           >

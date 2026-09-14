@@ -10,6 +10,8 @@ An assistant that manages email and calendar events necessarily handles sensitiv
 
 Running the full pipeline locally — speech-to-text, the LLM, and text-to-speech — removes that risk at the source: no request ever leaves the machine, so there's no third party to trust, no data-handling policy to audit, and nothing to leak. It also has no ongoing API/subscription cost and works entirely offline, no internet connection required once set up.
 
+![Sid screenshot](public/screenshot_01.png)
+
 ## How it works
 
 ```
@@ -23,7 +25,7 @@ Browser (mic)                Next.js app (:3000)              Python voice-servi
 ```
 
 - **Frontend** ([src/components/chat-interface.jsx](src/components/chat-interface.jsx)) — records mic audio, runs simple voice-activity detection (RMS + silence timeout) to auto-segment speech, and drives the call UI.
-- **Chat** ([src/app/api/agentChatRes/route.ts](src/app/api/agentChatRes/route.ts)) — forwards conversation history to a local [Ollama](https://ollama.com) model.
+- **Chat** ([src/app/api/agentChatRes/route.ts](src/app/api/agentChatRes/route.ts)) — forwards conversation history to a local [Ollama](https://ollama.com) model, which can call tools to check the weather/date, read Gmail, and read/create Google Calendar events ([src/lib/gmail.ts](src/lib/gmail.ts), [src/lib/calendar.ts](src/lib/calendar.ts)).
 - **Speech** ([voice-service/server.py](voice-service/server.py)) — a small FastAPI service that transcribes audio with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and synthesizes replies with [Piper](https://github.com/rhasspy/piper).
 
 ## Prerequisites
@@ -76,7 +78,33 @@ python server.py
 
 It listens on `http://127.0.0.1:8001`.
 
-### 4. Set up the frontend
+### 4. Connect Gmail and Google Calendar (optional)
+
+Sid can check your inbox and read/create calendar events. This step is optional —
+skip it and those tools will just reply that they're not connected; weather,
+date, and general chat still work without it.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), create a
+   project (or use an existing one), enable the **Gmail API** and the
+   **Google Calendar API**, and create an OAuth client ID of type **Desktop app**.
+2. Create `.env.local` in the project root (if it doesn't exist) and add the
+   client ID/secret from that OAuth client:
+   ```bash
+   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+3. Run the one-time auth script — it opens a consent screen requesting Gmail
+   read and Calendar read/write access, then writes `GOOGLE_REFRESH_TOKEN` into
+   `.env.local` for you:
+   ```bash
+   npm run auth:google
+   ```
+
+If your OAuth consent screen is in "Testing" publishing status, add your own
+Google account as a test user and make sure the Calendar scope is listed under
+the consent screen's configured scopes, or the grant will be rejected.
+
+### 5. Set up the frontend
 
 In a separate terminal, from the project root:
 
@@ -96,6 +124,7 @@ Click the green phone button to start a call — the mic stays open and auto-det
 - [Next.js](https://nextjs.org) 16 (App Router) + [React](https://react.dev) 19, in TypeScript (API routes) and JSX (components)
 - [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) components, plain CSS for global styles
 - [Ollama](https://ollama.com) for local LLM inference
+- [googleapis](https://github.com/googleapis/google-api-nodejs-client) for the Gmail and Google Calendar tool integrations
 - Python microservice ([FastAPI](https://fastapi.tiangolo.com)) for speech-to-text and text-to-speech:
   - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) for speech-to-text
   - [Piper](https://github.com/rhasspy/piper) for text-to-speech
@@ -114,4 +143,5 @@ Click the green phone button to start a call — the mic stays open and auto-det
 ## Notes
 
 - The Piper voice model (`voice-service/piper-voices/`) and the Python virtual environment (`voice-service/.venv/`) are gitignored — they're large binary/generated artifacts, not source. Follow the setup steps above to regenerate them locally.
-- Everything runs on `localhost`; nothing is sent to a third-party service.
+- Everything runs on `localhost`; nothing is sent to a third-party service, apart from your own Gmail/Calendar data going directly to Google's APIs if you complete the optional Google setup step.
+- `.env.local` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`) is gitignored — never commit it. If you ever suspect a token or secret leaked, revoke it at [Google Account permissions](https://myaccount.google.com/permissions) and re-run `npm run auth:google`.

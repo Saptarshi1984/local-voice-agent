@@ -1,9 +1,10 @@
 import { google } from 'googleapis';
-import credentials from '@/app/data/credentials.json';
 
 function getOAuth2Client() {
-  const { client_id, client_secret, redirect_uris } = credentials.installed;
-  const client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  const client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
   client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
   return client;
 }

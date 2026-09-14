@@ -1,7 +1,7 @@
 // One-time Gmail OAuth setup. Run with `npm run auth:google`.
-// Reads src/app/data/credentials.json, walks you through Google's consent
-// screen via a temporary local server, then writes the refresh token to
-// .env.local as GOOGLE_REFRESH_TOKEN.
+// Reads GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET from .env.local, walks you
+// through Google's consent screen via a temporary local server, then writes
+// the refresh token to .env.local as GOOGLE_REFRESH_TOKEN.
 
 import fs from 'node:fs';
 import http from 'node:http';
@@ -16,29 +16,26 @@ const SCOPES = [
 ];
 const TIMEOUT_MS = 5 * 60 * 1000;
 
-const credentialsPath = path.resolve(process.cwd(), 'src/app/data/credentials.json');
+const envLocalPath = path.resolve(process.cwd(), '.env.local');
 
 function loadCredentials() {
-  if (!fs.existsSync(credentialsPath)) {
-    console.error(
-      `credentials.json not found at ${credentialsPath} — download it from Google Cloud Console (OAuth client, type "Desktop app") and place it there.`
-    );
-    process.exit(1);
+  if (fs.existsSync(envLocalPath)) {
+    process.loadEnvFile(envLocalPath);
   }
-  const raw = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-  const { client_id, client_secret } = raw.installed ?? {};
+  const { GOOGLE_CLIENT_ID: client_id, GOOGLE_CLIENT_SECRET: client_secret } = process.env;
   if (!client_id || !client_secret) {
-    console.error('credentials.json is missing installed.client_id / installed.client_secret.');
+    console.error(
+      `GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not found in ${envLocalPath} — copy them from your Google Cloud Console OAuth client (type "Desktop app") and add them there.`
+    );
     process.exit(1);
   }
   return { client_id, client_secret };
 }
 
 function updateEnvLocal(refreshToken) {
-  const envPath = path.resolve(process.cwd(), '.env.local');
   let content = '';
   try {
-    content = fs.readFileSync(envPath, 'utf8');
+    content = fs.readFileSync(envLocalPath, 'utf8');
   } catch (err) {
     if (err.code !== 'ENOENT') throw err;
   }
@@ -51,7 +48,7 @@ function updateEnvLocal(refreshToken) {
     content += `${line}\n`;
   }
 
-  fs.writeFileSync(envPath, content, 'utf8');
+  fs.writeFileSync(envLocalPath, content, 'utf8');
 }
 
 async function main() {
