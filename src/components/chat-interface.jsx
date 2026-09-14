@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Phone, PhoneOff, Plus, Settings } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Plus, Settings, Volume2, VolumeX } from 'lucide-react';
 
 import { Message, MessageContent } from '@/components/ui/message';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
@@ -9,9 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Card,
-  CardAction,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -73,6 +71,7 @@ export function ChatInterface() {
   const [agentState, setAgentState] = useState('Sleeping');
   const [isInCall, setIsInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [emailDetails, setEmailDetails] = useState(null);
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [calendarEvents, setCalendarEvents] = useState(null);
@@ -88,6 +87,8 @@ export function ChatInterface() {
   const hasSpeechRef = useRef(false);
   const isInCallRef = useRef(false);
   const isSpeakingRef = useRef(false);
+  const isSpeakerMutedRef = useRef(false);
+  const currentAudioRef = useRef(null);
   const transcriptRef = useRef(null);
   const messagesRef = useRef([]);
 
@@ -198,7 +199,7 @@ export function ChatInterface() {
       }
     }
 
-    setAgentState('Speaking');
+    setAgentState(isSpeakerMutedRef.current ? 'Muted' : 'Speaking');
 
     try {
       const res = await fetch('/api/speak', {
@@ -211,6 +212,8 @@ export function ChatInterface() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.muted = isSpeakerMutedRef.current;
+      currentAudioRef.current = audio;
 
       await new Promise((resolve) => {
         audio.onended = resolve;
@@ -218,6 +221,7 @@ export function ChatInterface() {
         audio.play().catch(resolve);
       });
 
+      currentAudioRef.current = null;
       URL.revokeObjectURL(url);
     } catch (err) {
       // playback failure shouldn't break the chat flow
@@ -306,6 +310,20 @@ export function ChatInterface() {
     });
   }
 
+  function toggleSpeakerMute() {
+    setIsSpeakerMuted((prev) => {
+      const next = !prev;
+      isSpeakerMutedRef.current = next;
+      if (currentAudioRef.current) {
+        currentAudioRef.current.muted = next;
+      }
+      if (isSpeakingRef.current || currentAudioRef.current) {
+        setAgentState(next ? 'Muted' : 'Speaking');
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="flex h-screen flex-col gap-4 p-4">
       <div className="mx-auto w-full max-w-4xl text-center ">
@@ -316,7 +334,7 @@ export function ChatInterface() {
       </div>
       <div className="mx-auto flex w-full max-w-4xl gap-4">
         <Card className="flex-1">
-          <CardHeader>
+          <CardHeader className="min-h-8 items-center">
             <CardTitle className="text-md font-semibold">Transcripts:</CardTitle>
           </CardHeader>
           <CardContent
@@ -347,7 +365,7 @@ export function ChatInterface() {
           </CardFooter>
         </Card>
         <Card className="flex-1">
-          <CardHeader>
+          <CardHeader className="min-h-8 items-center">
             <CardTitle className="flex items-center gap-2">
               <Avatar>
                 <AvatarFallback className="relative overflow-hidden">
@@ -357,9 +375,16 @@ export function ChatInterface() {
                 </AvatarFallback>
               </Avatar>
               Sid
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={toggleSpeakerMute}
+                className="ml-auto rounded-full border border-border cursor-pointer"
+                aria-label={isSpeakerMuted ? 'Unmute Sid' : 'Mute Sid'}
+              >
+                {isSpeakerMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+              </Button>
             </CardTitle>
-            <CardDescription>Email & Calendar agent</CardDescription>
-            <CardAction className="text-sm text-muted-foreground">{agentState}</CardAction>
           </CardHeader>
           <CardContent className="scrollbar-hover h-100 overflow-y-auto border-t border-b border-border p-4">
             {selectedEmail ? (
@@ -375,6 +400,9 @@ export function ChatInterface() {
               <EmailsDetailsClient emails={emailDetails} onSelect={setSelectedEmail} />
             )}
           </CardContent>
+          <CardFooter>
+            <p className="text-sm text-muted-foreground">{agentState}</p>
+          </CardFooter>
         </Card>
       </div>
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-2">

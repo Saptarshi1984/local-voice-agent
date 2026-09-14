@@ -10,7 +10,7 @@ An assistant that manages email and calendar events necessarily handles sensitiv
 
 Running the full pipeline locally — speech-to-text, the LLM, and text-to-speech — removes that risk at the source: no request ever leaves the machine, so there's no third party to trust, no data-handling policy to audit, and nothing to leak. It also has no ongoing API/subscription cost and works entirely offline, no internet connection required once set up.
 
-![Sid screenshot](public/screenshot_01.png)
+![Sid screenshot](public/screenshot_02.png)
 
 ## How it works
 
@@ -131,14 +131,14 @@ Click the green phone button to start a call — the mic stays open and auto-det
 
 ## System Requirements
 
-| | Minimum |
-|---|---|
-| **OS** | Linux or Windows (WSL2 recommended for CUDA); macOS works for the frontend and LLM, but `faster-whisper` needs a CUDA GPU (see below) |
-| **CPU** | 4-core modern x86_64 |
-| **RAM** | 8 GB (16 GB recommended — the LLM, Whisper model, and Piper all stay resident at once) |
-| **GPU** | NVIDIA GPU with CUDA 12 support and ~4 GB VRAM, for `faster-whisper` (hardcoded to `device="cuda"` in [voice-service/server.py](voice-service/server.py)). No GPU works too if you switch that line to `device="cpu"` — expect much slower transcription |
-| **Disk space** | ~10 GB free (≈2 GB for the `llama3.2:3b` Ollama model, ~1 GB for the Whisper model download, ~65 MB for the Piper voice, plus `node_modules` and the Python venv) |
-| **Network** | Only needed for initial setup (pulling the Ollama model, pip/npm installs, downloading the Piper voice) — no connection required once everything is installed |
+|                | Minimum                                                                                                                                                                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OS**         | Linux or Windows (WSL2 recommended for CUDA); macOS works for the frontend and LLM, but `faster-whisper` needs a CUDA GPU (see below)                                                                                                                    |
+| **CPU**        | 4-core modern x86_64                                                                                                                                                                                                                                     |
+| **RAM**        | 8 GB (16 GB recommended — the LLM, Whisper model, and Piper all stay resident at once)                                                                                                                                                                   |
+| **GPU**        | NVIDIA GPU with CUDA 12 support and ~4 GB VRAM, for `faster-whisper` (hardcoded to `device="cuda"` in [voice-service/server.py](voice-service/server.py)). No GPU works too if you switch that line to `device="cpu"` — expect much slower transcription |
+| **Disk space** | ~10 GB free (≈2 GB for the `llama3.2:3b` Ollama model, ~1 GB for the Whisper model download, ~65 MB for the Piper voice, plus `node_modules` and the Python venv)                                                                                        |
+| **Network**    | Only needed for initial setup (pulling the Ollama model, pip/npm installs, downloading the Piper voice) — no connection required once everything is installed                                                                                            |
 
 ## Notes
 

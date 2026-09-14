@@ -1,6 +1,6 @@
 export function EmailsDetailsClient({ emails, onSelect }) {
   if (!emails || emails.length === 0) {
-    return <p className="text-sm text-muted-foreground">No unread emails.</p>;
+    return <p className="text-sm text-muted-foreground">What's on your mind today?</p>;
   }
 
   return (
