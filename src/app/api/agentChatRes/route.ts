@@ -1,6 +1,6 @@
 import ollama from 'ollama';
 import { get_unread_email_count, get_unread_emails_details, type EmailDetail } from '@/lib/gmail';
-import { list_events, create_event, type CalendarEvent } from '@/lib/calendar';
+import { list_events, create_event, delete_event, delete_events_on_date, modify_event, type CalendarEvent } from '@/lib/calendar';
 
 function get_weather(city: string): string {
   // Mock implementation of the get_weather function
@@ -11,7 +11,8 @@ function get_weather(city: string): string {
 function get_date(offsetDays: number = 0): string {
   const date = new Date();
   date.setDate(date.getDate() + Number(offsetDays));
-  return `${date.toDateString()} ${date.toLocaleTimeString()}`;
+  const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return `${iso} (${date.toDateString()}), current time ${date.toLocaleTimeString()}`;
 }
 
 const tools = [
@@ -118,12 +119,12 @@ const tools = [
     function: {
       name: 'create_event',
       description:
-        "Create a new event on the user's calendar. Only call this once you have a clear event title, a specific date, and a specific start time — if the user hasn't given a time, date, or a clear event name, ask them one short clarifying question first instead of guessing or picking a default. Duration defaults to 1 hour if not given. After creating, briefly confirm what was created and when — don't restate the full request.",
+        "Create a BRAND-NEW event on the user's calendar — one that doesn't already exist. If the user wants to move, reschedule, or change an event that's already on the calendar, use modify_event instead; calling create_event for that would leave the old event in place and create a duplicate. Only call this once you have a clear event title, a specific date, and a specific start time — if the user hasn't given a time, date, or a clear event name, ask them one short clarifying question first instead of guessing or picking a default. Duration defaults to 1 hour if not given. After creating, briefly confirm what was created and when — don't restate the full request.",
       parameters: {
         type: 'object',
         properties: {
           summary: { type: 'string', description: 'Short event title, e.g. "Meeting with Bob"' },
-          date: { type: 'string', description: 'Event date, e.g. "2026-09-15". Must be specific — never guess.' },
+          date: { type: 'string', description: 'Event date, e.g. "2026-09-15", or literally "today"/"tomorrow"/"yesterday". Must be specific or one of those words — never guess a different date.' },
           start_time: { type: 'string', description: 'Start time, 24-hour HH:MM, e.g. "15:00" for 3pm. Must be specific — never guess.' },
           duration_minutes: { type: 'number', description: 'Event length in minutes. Defaults to 60 if end_time not set.' },
           end_time: { type: 'string', description: '24-hour HH:MM. Optional — overrides duration_minutes.' },
@@ -131,6 +132,63 @@ const tools = [
           location: { type: 'string', description: 'Optional event location.' },
         },
         required: ['summary', 'date', 'start_time'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_event',
+      description:
+        "Delete an event from the user's calendar. Identify the event by its title and the date it's on. If the tool reports more than one matching event, it lists each one's title and time — read that list back to the user and ask which one they meant, then call this again with the time field set to pick the right one. Confirm briefly once deleted.",
+      parameters: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string', description: 'Title (or a distinctive part of it) of the event to delete, e.g. "Meeting with Bob"' },
+          date: { type: 'string', description: "The date the event is on, e.g. \"2026-09-15\", or literally \"today\"/\"tomorrow\"/\"yesterday\". Must be specific or one of those words — never guess a different date." },
+          time: { type: 'string', description: 'Optional 24-hour HH:MM start time, only needed to pick between multiple same-titled events on the same day.' },
+        },
+        required: ['summary', 'date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_events_on_date',
+      description:
+        "Delete EVERY event on a given date — a bulk, irreversible action. This is a two-step tool: call it first with confirm left false (or omitted) to get back the list of events on that date without deleting anything, read that list back to the user, and wait for them to explicitly say yes. Only then call it again with confirm set to true to actually delete them all. Never set confirm to true on the first call, and never assume the user meant to delete everything unless they explicitly asked to clear/delete all events on that specific date.",
+      parameters: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'The date to clear, e.g. "2026-09-15", or literally "today"/"tomorrow"/"yesterday". Must be specific or one of those words — never guess a different date.' },
+          confirm: { type: 'boolean', description: 'Set to true only after the user has explicitly confirmed, having heard the list of events that will be deleted. Defaults to false.' },
+        },
+        required: ['date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'modify_event',
+      description:
+        "Change an EXISTING event on the user's calendar — this is the tool for \"move\", \"reschedule\", \"change the time/date of\", \"rename\", or \"update\" an event that's already on the calendar. Identify the event by its current title and the date it's currently on. Only pass the fields that are actually changing (new_summary, new_date, new_start_time, new_end_time, duration_minutes, description, location). If the tool reports more than one matching event, it lists each one's title and time — read that list back to the user and ask which one they meant, then call this again with current_time set to pick the right one. Never use create_event for this — create_event makes a brand-new, separate event and would leave the original in place, producing a duplicate instead of moving it. If the event to modify or the change requested is unclear, ask a short clarifying question first. Confirm briefly once updated.",
+      parameters: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string', description: 'Current title (or a distinctive part of it) of the event to modify, e.g. "Meeting with Bob"' },
+          current_date: { type: 'string', description: "The date the event is CURRENTLY on, right now, before any change — e.g. \"2026-09-15\", or literally \"today\"/\"tomorrow\"/\"yesterday\". This is where to find the event, not where it's moving to. Must be specific or one of those words — never guess a different date." },
+          current_time: { type: 'string', description: 'Optional 24-hour HH:MM start time the event is CURRENTLY at, only needed to pick between multiple same-titled events on the same day.' },
+          new_summary: { type: 'string', description: 'New title for the event, if changing.' },
+          new_date: { type: 'string', description: 'The date to move the event TO, e.g. "2026-09-16", or literally "today"/"tomorrow"/"yesterday" — only set this if the event is moving to a different day than current_date.' },
+          new_start_time: { type: 'string', description: 'New start time, 24-hour HH:MM, if changing.' },
+          new_end_time: { type: 'string', description: '24-hour HH:MM. Optional — overrides duration_minutes.' },
+          duration_minutes: { type: 'number', description: 'New event length in minutes, if changing and new_end_time not given.' },
+          description: { type: 'string', description: 'New notes/details, if changing.' },
+          location: { type: 'string', description: 'New location, if changing.' },
+        },
+        required: ['summary', 'current_date'],
       },
     },
   },
@@ -155,9 +213,45 @@ const toolImpls: Record<string, (args: any) => string | Promise<string>> = {
       args.description,
       args.location
     ),
+  delete_event: (args) => delete_event(args.summary, args.date, args.time),
+  delete_events_on_date: (args) => delete_events_on_date(args.date, args.confirm === true),
+  modify_event: (args) =>
+    modify_event(
+      args.summary,
+      args.current_date,
+      args.new_summary,
+      args.new_date,
+      args.new_start_time,
+      args.new_end_time,
+      args.duration_minutes !== undefined ? Number(args.duration_minutes) : undefined,
+      args.description,
+      args.location,
+      args.current_time
+    ),
 };
 
 const MAX_TOOL_TURNS = 4;
+
+function looksLikeGarbledToolCall(content: string | undefined): boolean {
+  if (!content) return false;
+  const trimmed = content.trim();
+  return trimmed.startsWith('{') && trimmed.endsWith('}') && /"name"\s*:/.test(trimmed);
+}
+
+async function chatWithRetry(
+  params: Parameters<typeof ollama.chat>[0],
+  retries = 1,
+  delayMs = 3000
+): ReturnType<typeof ollama.chat> {
+  try {
+    return await ollama.chat(params);
+  } catch (err) {
+    if (retries <= 0) throw err;
+    console.error('ollama.chat failed, retrying:', err);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return chatWithRetry(params, retries - 1, delayMs);
+  }
+}
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
@@ -165,11 +259,25 @@ export async function POST(req: Request) {
   let currentMessages = [...messages];
   let emailDetails: EmailDetail[] | null = null;
   let calendarEvents: CalendarEvent[] | null = null;
-  let response = await ollama.chat({
-    model: 'sid:latest',
-    messages: currentMessages,
-    tools: tools,
-  });
+  let response: Awaited<ReturnType<typeof ollama.chat>>;
+
+  try {
+    response = await chatWithRetry({
+      model: 'sid:latest',
+      messages: currentMessages,
+      tools: tools,
+    });
+  } catch (err) {
+    console.error('ollama.chat failed after retries:', err);
+    return new Response(
+      JSON.stringify({
+        message: { role: 'assistant', content: "Couldn't reach my brain just now — give it a second and try again." },
+        emailDetails: null,
+        calendarEvents: null,
+      }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
     const toolCalls = response.message.tool_calls;
@@ -247,11 +355,42 @@ export async function POST(req: Request) {
       });
     }
 
-    response = await ollama.chat({
-      model: 'sid:latest',
-      messages: currentMessages,
-      tools: tools,
-    });
+    try {
+      response = await chatWithRetry({
+        model: 'sid:latest',
+        messages: currentMessages,
+        tools: tools,
+      });
+    } catch (err) {
+      console.error('ollama.chat failed after retries:', err);
+      return new Response(
+        JSON.stringify({
+          message: { role: 'assistant', content: "Couldn't reach my brain just now — give it a second and try again." },
+          emailDetails,
+          calendarEvents,
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+
+  for (let attempt = 0; looksLikeGarbledToolCall(response.message.content) && attempt < 2; attempt++) {
+    console.error('Garbled tool-call-like reply, regenerating:', response.message.content);
+    try {
+      response = await chatWithRetry({
+        model: 'sid:latest',
+        messages: currentMessages,
+        tools: tools,
+      });
+    } catch (err) {
+      console.error('regeneration after garbled reply failed:', err);
+      break;
+    }
+  }
+
+  if (looksLikeGarbledToolCall(response.message.content)) {
+    console.error('Garbled tool-call-like reply persisted after retries:', response.message.content);
+    response.message.content = 'Sorry, what was that?';
   }
 
   return new Response(JSON.stringify({ ...response, emailDetails, calendarEvents }), {
